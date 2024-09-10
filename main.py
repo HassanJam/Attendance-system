@@ -29,12 +29,39 @@ with open("Encodefile.p", "rb") as file:
 
 encoding_list_known, employee_ids = encoding_list_known_with_ids
 print("Loaded encoded file")
-def final_Attendance(employee_id, date):
-    query = "SELECT min(log_time)"
+
+def calculate_attendance(employee_id, date):  
+    print("Calculating attendance for", employee_id, "on", date)      
+    query = "SELECT min(log_time) as in_time, max(log_time) as out_time FROM rawdata WHERE employeid=%s AND date=%s"
+    cursor.execute(query, (employee_id, date))
+    print("in time,out time calculated")
+    result = cursor.fetchone()
+    print(result)
+    Status = "present"
+
+    worked = result[1] - result[0]
+    hours_worked = worked.total_seconds() / 3600
+    if hours_worked >8:
+        overtime = hours_worked - 8
+    else:
+        overtime = 0
+
+    query1 = "INSERT INTO attendance (employee_id, date, time_in, time_out, status, hours_worked, is_overtime) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+    cursor.execute(query1, (employee_id, date, result[0], result[1], Status, hours_worked, overtime))
+    mydb.commit()
+    print(f"Attendance for {employee_id} on {date} has been added to the database")
+  
+def final_Attendance(employee_ids, date):
+    for employee_id in employee_ids:
+        calculate_attendance(employee_id[0], date)
+
+  
+
 
 def log_attendance(employee_id):
     current_date = datetime.now().date()
-    current_time = datetime.now().second
+    current_time = datetime.now().time()
+    check_current_time = datetime.now().second
 
     # Check if the employee already logged in today
     query = "SELECT * FROM rawdata WHERE employeid=%s AND date=%s ORDER BY log_time DESC LIMIT 1"
@@ -45,15 +72,15 @@ def log_attendance(employee_id):
         # Convert the last logged in time to a datetime object (assuming in_time is a datetime column)
         last_log_time = result[3]  # Assuming result[3] is the 'in_time' column
         
-        print("last " , last_log_time)
-        print("type " , type(last_log_time))
+       # print("last " , last_log_time)
+        #print("type " , type(last_log_time))
         
 
-        time_difference = current_time - last_log_time.total_seconds()
+        time_difference = check_current_time - last_log_time.total_seconds()
 
             # If the time difference is less than 10 minutes, don't log again
         if time_difference < 10:  # 600 seconds = 10 minutes
-            print(f"Attendance for {employee_id} has already been logged within the last 10 minutes.")
+            #print(f"Attendance for {employee_id} has already been logged within the last 10 minutes.")
             return
 
     # If no log is found or time difference is more than 10 minutes, log the attendance
@@ -64,7 +91,20 @@ def log_attendance(employee_id):
 
 
 while True:
-   
+    current_time = datetime.now()
+    current_date = current_time.date() 
+    previous_date = current_time.date() - timedelta(days=1)
+    print("previous date", previous_date)
+    current_time_only = current_time.time()
+
+
+
+# Define the time range for comparison
+    start_time = datetime.strptime('18:35:00', '%H:%M:%S').time()
+    end_time = datetime.strptime('19:30:00', '%H:%M:%S').time()
+
+
+
     success, img = cap.read()
     if not success:
         print("Failed to capture image")
@@ -98,6 +138,17 @@ while True:
 
             
             log_attendance(employee_id)
+            # Check if the current time falls within the specified range
+    if start_time <= current_time_only <= end_time:
+        print("Attendance for the day has been closed")
+        query = "SELECT employeid FROM rawdata WHERE date=%s"
+        cursor.execute(query, (current_date,))
+        result = cursor.fetchall()
+        
+        final_Attendance(result, current_date)
+        print("Attendance added to the database")
+    else:
+        print("Outside the time range for closing attendance")
 
     cv2.imshow("Face Attendance", img)
 
