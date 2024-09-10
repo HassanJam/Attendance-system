@@ -4,6 +4,8 @@ import numpy as np
 import face_recognition
 import mysql.connector
 from datetime import datetime
+# Function to log attendance to the database
+from datetime import datetime, timedelta
 
 
 mydb = mysql.connector.connect(
@@ -27,24 +29,39 @@ with open("Encodefile.p", "rb") as file:
 
 encoding_list_known, employee_ids = encoding_list_known_with_ids
 print("Loaded encoded file")
+def final_Attendance(employee_id, date):
+    query = "SELECT min(log_time)"
 
-# Function to log attendance to the database
 def log_attendance(employee_id):
     current_date = datetime.now().date()
-    current_time = datetime.now().time()
+    current_time = datetime.now().second
 
     # Check if the employee already logged in today
-    query = "SELECT * FROM attendance WHERE employee_id=%s AND date=%s"
+    query = "SELECT * FROM rawdata WHERE employeid=%s AND date=%s ORDER BY log_time DESC LIMIT 1"
     cursor.execute(query, (employee_id, current_date))
     result = cursor.fetchone()
 
-    if result is None:  
-        query = "INSERT INTO attendance (employee_id, date, in_time) VALUES (%s, %s, %s)"
-        cursor.execute(query, (employee_id, current_date, current_time))
-        mydb.commit()
-        print(f"Attendance logged for {employee_id} at {current_time}")
-    else:
-        print(f"Attendance for {employee_id} has already been logged today.")
+    if result is not None:
+        # Convert the last logged in time to a datetime object (assuming in_time is a datetime column)
+        last_log_time = result[3]  # Assuming result[3] is the 'in_time' column
+        
+        print("last " , last_log_time)
+        print("type " , type(last_log_time))
+        
+
+        time_difference = current_time - last_log_time.total_seconds()
+
+            # If the time difference is less than 10 minutes, don't log again
+        if time_difference < 10:  # 600 seconds = 10 minutes
+            print(f"Attendance for {employee_id} has already been logged within the last 10 minutes.")
+            return
+
+    # If no log is found or time difference is more than 10 minutes, log the attendance
+    query = "INSERT INTO rawdata (employeid, date, log_time) VALUES (%s, %s, %s)"
+    cursor.execute(query, (employee_id, current_date, current_time))
+    mydb.commit()
+    print(f"Attendance logged for {employee_id} at {current_time}")
+
 
 while True:
    
