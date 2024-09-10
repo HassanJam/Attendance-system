@@ -63,8 +63,8 @@ while True:
     for encode_face, face_location in zip(encode_current_frame, face_current_frame):
         matches = face_recognition.compare_faces(encoding_list_known, encode_face)
         face_distance = face_recognition.face_distance(encoding_list_known, encode_face)
-
         
+                
         match_index = np.argmin(face_distance)
 
         if matches[match_index]:
