@@ -46,9 +46,14 @@ def calculate_attendance(employee_id, date):
     else:
         overtime = 0
 
-    query1 = "INSERT INTO attendance (employee_id, date, time_in, time_out, status, hours_worked, is_overtime) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-    cursor.execute(query1, (employee_id, date, result[0], result[1], Status, hours_worked, overtime))
-    mydb.commit()
+    try:
+        query1 = "INSERT INTO attendance (employee_id, date, time_in, time_out, status, hours_worked, is_overtime) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+        cursor.execute(query1, (employee_id, date, result[0], result[1], Status, hours_worked, overtime))
+        mydb.commit()
+    except Exception as e:
+        print("Duplicate entry:", str(e))
+        return
+ 
     print(f"Attendance for {employee_id} on {date} has been added to the database")
   
 def final_Attendance(employee_ids, date):
@@ -61,23 +66,28 @@ def final_Attendance(employee_ids, date):
 def log_attendance(employee_id):
     current_date = datetime.now().date()
     current_time = datetime.now().time()
-    check_current_time = datetime.now().second
-
+    check_current_time = datetime.now().time() 
+    total_seconds = check_current_time.hour * 3600 + check_current_time.minute * 60 + check_current_time.second + check_current_time.microsecond / 1_000_000
+    print("total seconds", total_seconds)
     # Check if the employee already logged in today
     query = "SELECT * FROM rawdata WHERE employeid=%s AND date=%s ORDER BY log_time DESC LIMIT 1"
     cursor.execute(query, (employee_id, current_date))
     result = cursor.fetchone()
-
+    print("result", result)
+    print("!")
     if result is not None:
+
+        print("here")
         # Convert the last logged in time to a datetime object (assuming in_time is a datetime column)
         last_log_time = result[3]  # Assuming result[3] is the 'in_time' column
-        
+        print("last log time", last_log_time)
        # print("last " , last_log_time)
-        #print("type " , type(last_log_time))
+        print("type " , type(last_log_time))
         
-
-        time_difference = check_current_time - last_log_time.total_seconds()
-
+        print("current time", check_current_time)
+        print("last log time in seconds`", last_log_time.seconds)
+        time_difference = total_seconds - last_log_time.total_seconds()
+        print("time difference", time_difference)
             # If the time difference is less than 10 minutes, don't log again
         if time_difference < 10:  # 600 seconds = 10 minutes
             #print(f"Attendance for {employee_id} has already been logged within the last 10 minutes.")
@@ -100,8 +110,8 @@ while True:
 
 
 # Define the time range for comparison
-    start_time = datetime.strptime('18:35:00', '%H:%M:%S').time()
-    end_time = datetime.strptime('19:30:00', '%H:%M:%S').time()
+    start_time = datetime.strptime('10:17:00', '%H:%M:%S').time()
+    end_time = datetime.strptime('10:30:00', '%H:%M:%S').time()
 
 
 
@@ -141,10 +151,10 @@ while True:
             # Check if the current time falls within the specified range
     if start_time <= current_time_only <= end_time:
         print("Attendance for the day has been closed")
-        query = "SELECT employeid FROM rawdata WHERE date=%s"
+        query = "SELECT DISTINCT employeid FROM rawdata WHERE date=%s"
         cursor.execute(query, (current_date,))
         result = cursor.fetchall()
-        
+        print("result", result)
         final_Attendance(result, current_date)
         print("Attendance added to the database")
     else:
